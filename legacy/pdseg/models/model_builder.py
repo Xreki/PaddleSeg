@@ -116,7 +116,8 @@ def build_model(main_prog, start_prog, phase=ModelPhase.TRAIN):
     class_num = cfg.DATASET.NUM_CLASSES
 
     with static.program_guard(main_prog, start_prog):
-        with paddle.utils.unique_name.guard():
+        _new_generator = paddle.utils.unique_name.UniqueNameGenerator()
+        with paddle.utils.unique_name.guard(_new_generator):
             # 在导出模型的时候，增加图像标准化预处理,减小预测部署时图像的处理流程
             # 预测部署时只须对输入图像增加batch_size维度即可
             image = static.data(
@@ -230,12 +231,12 @@ def build_model(main_prog, start_prog, phase=ModelPhase.TRAIN):
 
             if ModelPhase.is_train(phase):
                 optimizer = solver.Solver(main_prog, start_prog)
-                decayed_lr = optimizer.optimise(avg_loss)
+                decayed_lr, optimizer_ = optimizer.optimise(avg_loss)
                 if class_num == 1:
                     logit = sigmoid_to_softmax(logit)
                 else:
                     logit = softmax(logit)
-                return data_loader, avg_loss, decayed_lr, pred, label, mask
+                return data_loader, avg_loss, decayed_lr, pred, label, mask, optimizer_, _new_generator
 
 
 def to_int(string, dest="I"):

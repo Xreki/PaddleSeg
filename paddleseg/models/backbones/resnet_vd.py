@@ -26,23 +26,25 @@ __all__ = [
 
 
 class ConvBNLayer(nn.Layer):
-    def __init__(
-            self,
-            in_channels,
-            out_channels,
-            kernel_size,
-            stride=1,
-            dilation=1,
-            groups=1,
-            is_vd_mode=False,
-            act=None,
-            data_format="NCHW"
-    ):
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 kernel_size,
+                 stride=1,
+                 dilation=1,
+                 groups=1,
+                 is_vd_mode=False,
+                 act=None,
+                 data_format='NCHW'):
         super(ConvBNLayer, self).__init__()
 
         self.is_vd_mode = is_vd_mode
         self._pool2d_avg = nn.AvgPool2D(
-            kernel_size=2, stride=2, padding=0, ceil_mode=True, data_format=data_format)
+            kernel_size=2,
+            stride=2,
+            padding=0,
+            ceil_mode=True,
+            data_format=data_format)
         self._conv = nn.Conv2D(
             in_channels=in_channels,
             out_channels=out_channels,
@@ -54,7 +56,8 @@ class ConvBNLayer(nn.Layer):
             bias_attr=False,
             data_format=data_format)
 
-        self._batch_norm = layers.SyncBatchNorm(out_channels, data_format=data_format)
+        self._batch_norm = layers.SyncBatchNorm(
+            out_channels, data_format=data_format)
         self._act_op = layers.Activation(act=act)
 
     def forward(self, inputs):
@@ -75,9 +78,10 @@ class BottleneckBlock(nn.Layer):
                  shortcut=True,
                  if_first=False,
                  dilation=1,
-                 data_format="NCHW"):
+                 data_format='NCHW'):
         super(BottleneckBlock, self).__init__()
 
+        self.data_format = data_format
         self.conv0 = ConvBNLayer(
             in_channels=in_channels,
             out_channels=out_channels,
@@ -112,7 +116,6 @@ class BottleneckBlock(nn.Layer):
                 data_format=data_format)
 
         self.shortcut = shortcut
-        self.data_format = data_format
 
     def forward(self, inputs):
         y = self.conv0(inputs)
@@ -122,7 +125,9 @@ class BottleneckBlock(nn.Layer):
         # The performance drops down without the follow padding.
         if self.dilation > 1:
             padding = self.dilation
-            y = F.pad(y, [padding, padding, padding, padding], data_format=self.data_format)
+            y = F.pad(
+                y, [padding, padding, padding, padding],
+                data_format=self.data_format)
         #####################################################################
 
         conv1 = self.conv1(y)
@@ -145,7 +150,7 @@ class BasicBlock(nn.Layer):
                  stride,
                  shortcut=True,
                  if_first=False,
-                 data_format="NCHW"):
+                 data_format='NCHW'):
         super(BasicBlock, self).__init__()
         self.stride = stride
         self.conv0 = ConvBNLayer(
@@ -208,9 +213,10 @@ class ResNet_vd(nn.Layer):
                  output_stride=8,
                  multi_grid=(1, 1, 1),
                  pretrained=None,
-                 data_format="NCHW"):
+                 data_format='NCHW'):
         super(ResNet_vd, self).__init__()
 
+        self.data_format = data_format
         self.conv1_logit = None  # for gscnn shape stream
         self.layers = layers
         supported_layers = [18, 34, 50, 101, 152, 200]
@@ -243,7 +249,12 @@ class ResNet_vd(nn.Layer):
             dilation_dict = {3: 2}
 
         self.conv1_1 = ConvBNLayer(
-            in_channels=3, out_channels=32, kernel_size=3, stride=2, act='relu', data_format=data_format)
+            in_channels=3,
+            out_channels=32,
+            kernel_size=3,
+            stride=2,
+            act='relu',
+            data_format=data_format)
         self.conv1_2 = ConvBNLayer(
             in_channels=32,
             out_channels=32,
@@ -258,7 +269,8 @@ class ResNet_vd(nn.Layer):
             stride=1,
             act='relu',
             data_format=data_format)
-        self.pool2d_max = nn.MaxPool2D(kernel_size=3, stride=2, padding=1, data_format=data_format)
+        self.pool2d_max = nn.MaxPool2D(
+            kernel_size=3, stride=2, padding=1, data_format=data_format)
 
         # self.block_list = []
         self.stage_list = []

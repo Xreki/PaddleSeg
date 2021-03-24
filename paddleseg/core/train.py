@@ -81,7 +81,7 @@ def train(model,
         losses (dict): A dict including 'types' and 'coef'. The length of coef should equal to 1 or len(losses['types']).
             The 'types' item is a list of object of paddleseg.models.losses while the 'coef' item is a list of the relevant coefficient.
         keep_checkpoint_max (int, optional): Maximum number of checkpoints to save. Default: 5.
-        fp16: Whther to use amp.
+        fp16 (bool, optional): Whther to use amp.
     """
     model.train()
     nranks = paddle.distributed.ParallelEnv().nranks
@@ -107,7 +107,8 @@ def train(model,
 
     if nranks > 1:
         paddle.distributed.fleet.init(is_collective=True)
-        optimizer = paddle.distributed.fleet.distributed_optimizer(optimizer)
+        optimizer = paddle.distributed.fleet.distributed_optimizer(
+            optimizer)  # The return is Fleet object
         ddp_model = paddle.distributed.fleet.distributed_model(model)
 
     batch_sampler = paddle.io.DistributedBatchSampler(
@@ -151,9 +152,12 @@ def train(model,
             edges = None
             if len(data) == 3:
                 edges = data[2].astype('int64')
+            if model.data_format == 'NHWC':
+                images = images.transpose((0, 2, 3, 1))
 
             if fp16:
-                with paddle.amp.auto_cast(enable=True):
+                with paddle.amp.auto_cast(
+                        enable=True, custom_black_list={'bilinear_interp_v2'}):
                     if nranks > 1:
                         logits_list = ddp_model(images)
                     else:
@@ -167,7 +171,10 @@ def train(model,
 
                 scaled = scaler.scale(loss)  # scale the loss
                 scaled.backward()  # do backward
-                scaler.minimize(optimizer, scaled)  # update parameters
+                if isinstance(optimizer, paddle.distributed.fleet.Fleet):
+                    scaler.minimize(optimizer.user_defined_optimizer, scaled)
+                else:
+                    scaler.minimize(optimizer, scaled)  # update parameters
             else:
                 if nranks > 1:
                     logits_list = ddp_model(images)
@@ -210,7 +217,7 @@ def train(model,
                 avg_train_reader_cost = reader_cost_averager.get_average()
                 eta = calculate_eta(remain_iters, avg_train_batch_cost)
                 logger.info(
-                    "[TRAIN] epoch={}, iter={}/{}, loss={:.4f}, lr={:.6f}, batch_cost={:.4f}, reader_cost={:.5f}, ips={:.4f} samples/sec | ETA {}"
+                    "[TRAIN] epoch: {}, iter: {}/{}, loss: {:.4f}, lr: {:.6f}, batch_cost: {:.4f}, reader_cost: {:.5f}, ips: {:.4f} samples/sec | ETA {}"
                     .format((iter - 1) // iters_per_epoch + 1, iter, iters,
                             avg_loss, lr, avg_train_batch_cost,
                             avg_train_reader_cost,

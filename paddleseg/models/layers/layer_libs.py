@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -19,7 +21,7 @@ import paddle.nn.functional as F
 
 def SyncBatchNorm(*args, **kwargs):
     """In cpu environment nn.SyncBatchNorm does not have kernel so use nn.BatchNorm2D instead"""
-    if paddle.get_device() == 'cpu':
+    if paddle.get_device() == 'cpu' or os.environ.get('PADDLESEG_EXPORT_STAGE'):
         return nn.BatchNorm2D(*args, **kwargs)
     elif paddle.distributed.ParallelEnv().nranks == 1:
         return nn.BatchNorm2D(*args, **kwargs)
@@ -33,13 +35,16 @@ class ConvBNReLU(nn.Layer):
                  out_channels,
                  kernel_size,
                  padding='same',
-                 data_format="NCHW",
                  **kwargs):
         super().__init__()
 
         self._conv = nn.Conv2D(
-            in_channels, out_channels, kernel_size, padding=padding, data_format=data_format, **kwargs)
+            in_channels, out_channels, kernel_size, padding=padding, **kwargs)
 
+        if 'data_format' in kwargs:
+            data_format = kwargs['data_format']
+        else:
+            data_format = 'NCHW'
         self._batch_norm = SyncBatchNorm(out_channels, data_format=data_format)
 
     def forward(self, x):
@@ -55,11 +60,14 @@ class ConvBN(nn.Layer):
                  out_channels,
                  kernel_size,
                  padding='same',
-                 data_format="NCHW",
                  **kwargs):
         super().__init__()
         self._conv = nn.Conv2D(
-            in_channels, out_channels, kernel_size, padding=padding, data_format=data_format, **kwargs)
+            in_channels, out_channels, kernel_size, padding=padding, **kwargs)
+        if 'data_format' in kwargs:
+            data_format = kwargs['data_format']
+        else:
+            data_format = 'NCHW'
         self._batch_norm = SyncBatchNorm(out_channels, data_format=data_format)
 
     def forward(self, x):
@@ -69,7 +77,7 @@ class ConvBN(nn.Layer):
 
 
 class ConvReLUPool(nn.Layer):
-    def __init__(self, in_channels, out_channels, data_format="NCHW"):
+    def __init__(self, in_channels, out_channels):
         super().__init__()
         self.conv = nn.Conv2D(
             in_channels,
@@ -77,8 +85,7 @@ class ConvReLUPool(nn.Layer):
             kernel_size=3,
             stride=1,
             padding=1,
-            dilation=1,
-            data_format=data_format)
+            dilation=1)
 
     def forward(self, x):
         x = self.conv(x)
@@ -93,7 +100,6 @@ class SeparableConvBNReLU(nn.Layer):
                  out_channels,
                  kernel_size,
                  padding='same',
-                 data_format="NCHW",
                  **kwargs):
         super().__init__()
         self.depthwise_conv = ConvBN(
@@ -102,10 +108,17 @@ class SeparableConvBNReLU(nn.Layer):
             kernel_size=kernel_size,
             padding=padding,
             groups=in_channels,
-            data_format=data_format,
             **kwargs)
+        if 'data_format' in kwargs:
+            data_format = kwargs['data_format']
+        else:
+            data_format = 'NCHW'
         self.piontwise_conv = ConvBNReLU(
-            in_channels, out_channels, kernel_size=1, groups=1, data_format=data_format)
+            in_channels,
+            out_channels,
+            kernel_size=1,
+            groups=1,
+            data_format=data_format)
 
     def forward(self, x):
         x = self.depthwise_conv(x)

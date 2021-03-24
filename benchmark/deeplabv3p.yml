@@ -1,5 +1,5 @@
 batch_size: 2
-iters: 500
+iters: 80000
 
 train_dataset:
   type: Cityscapes
@@ -29,11 +29,12 @@ model:
     type: ResNet50_vd
     output_stride: 8
     multi_grid: [1, 2, 4]
-    data_format: "NHWC"
+#    data_format: "NHWC"
+    pretrained: https://bj.bcebos.com/paddleseg/dygraph/resnet50_vd_ssld_v2.tar.gz
   num_classes: 19
   backbone_indices: [0, 3]
   aspp_ratios: [1, 12, 24, 36]
-  data_format: "NHWC"
+#  data_format: "NHWC"
 
 optimizer:
   type: sgd
@@ -50,5 +51,5 @@ loss:
   types:
     - type: CrossEntropyLoss
       ignore_index: 255
-      data_format: "NHWC"
+#      data_format: "NHWC"
   coef: [1]

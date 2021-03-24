@@ -84,8 +84,8 @@ class Solver(object):
                     amp_lists=amp_lists,
                     use_dynamic_loss_scaling=True)
 
-        optimizer.minimize(loss)
-        return decayed_lr
+        # optimizer.minimize(loss)
+        return decayed_lr, optimizer
 
     def adam_optimizer(self, lr_policy, loss):
         decayed_lr = self.get_lr(lr_policy)
@@ -95,8 +95,8 @@ class Solver(object):
             beta2=self.momentum2,
             weight_decay=self.weight_decay,
         )
-        optimizer.minimize(loss)
-        return decayed_lr
+        #optimizer.minimize(loss)
+        return decayed_lr, optimizer
 
     def optimise(self, loss):
         lr_policy = cfg.SOLVER.LR_POLICY

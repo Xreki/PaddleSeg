@@ -19,7 +19,7 @@ import paddle
 
 from paddleseg.cvlibs import manager, Config
 from paddleseg.core import evaluate
-from paddleseg.utils import get_sys_env, logger, config_check
+from paddleseg.utils import get_sys_env, logger, config_check, utils
 
 
 def parse_args():
@@ -87,6 +87,13 @@ def parse_args():
         'The stride of sliding window, the first is width and the second is height.',
         type=int,
         default=None)
+    parser.add_argument(
+        '--data_format',
+        dest='data_format',
+        help=
+        'Data format that specifies the layout of input. It can be "NCHW" or "NHWC". Default: "NCHW".',
+        type=str,
+        default='NCHW')
 
     return parser.parse_args()
 
@@ -101,6 +108,12 @@ def main(args):
         raise RuntimeError('No configuration file specified.')
 
     cfg = Config(args.cfg)
+    cfg.dic['model']['data_format'] = args.data_format
+    cfg.dic['model']['backbone']['data_format'] = args.data_format
+    loss_len = len(cfg.dic['loss']['types'])
+    for i in range(loss_len):
+        cfg.dic['loss']['types'][i]['data_format'] = args.data_format
+
     val_dataset = cfg.val_dataset
     if val_dataset is None:
         raise RuntimeError(
@@ -118,8 +131,7 @@ def main(args):
 
     model = cfg.model
     if args.model_path:
-        para_state_dict = paddle.load(args.model_path)
-        model.set_dict(para_state_dict)
+        utils.load_entire_model(model, args.model_path)
         logger.info('Loaded trained params of model successfully')
 
     config_check(cfg, val_dataset=val_dataset)
